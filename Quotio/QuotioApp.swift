@@ -16,11 +16,10 @@ struct QuotioApp: App {
     @State private var viewModel = QuotaViewModel()
     @State private var menuBarSettings = MenuBarSettingsManager.shared
     @State private var statusBarManager = StatusBarManager.shared
+    @State private var modeManager = AppModeManager.shared
     @State private var showOnboarding = false
     @AppStorage("autoStartProxy") private var autoStartProxy = false
     @Environment(\.openWindow) private var openWindow
-    
-    private let modeManager = AppModeManager.shared
     
     #if canImport(Sparkle)
     private let updaterService = UpdaterService.shared
@@ -120,6 +119,9 @@ struct QuotioApp: App {
                 .onChange(of: menuBarSettings.colorMode) {
                     updateStatusBar()
                 }
+                .onChange(of: modeManager.currentMode) {
+                    updateStatusBar()
+                }
                 .sheet(isPresented: $showOnboarding) {
                     ModePickerView {
                         Task { await initializeApp() }
@@ -210,7 +212,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct ContentView: View {
     @Environment(QuotaViewModel.self) private var viewModel
     @AppStorage("loggingToFile") private var loggingToFile = true
-    private let modeManager = AppModeManager.shared
+    @State private var modeManager = AppModeManager.shared
     
     var body: some View {
         @Bindable var vm = viewModel

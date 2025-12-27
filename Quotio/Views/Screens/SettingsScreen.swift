@@ -204,39 +204,29 @@ struct SettingsScreen: View {
 
 struct AppModeSection: View {
     @Environment(QuotaViewModel.self) private var viewModel
-    private let modeManager = AppModeManager.shared
+    @State private var modeManager = AppModeManager.shared
     @State private var showModeChangeConfirmation = false
     @State private var pendingMode: AppMode?
     
     var body: some View {
         Section {
-            Picker("settings.appMode".localized(), selection: Binding(
-                get: { modeManager.currentMode },
-                set: { newMode in
-                    if modeManager.isFullMode && newMode == .quotaOnly {
-                        // Confirm before switching from full to quota-only
-                        pendingMode = newMode
-                        showModeChangeConfirmation = true
-                    } else {
-                        // Switch immediately for other transitions
-                        switchToMode(newMode)
-                    }
+            // Mode selection cards
+            VStack(spacing: 10) {
+                AppModeCard(
+                    mode: .full,
+                    isSelected: modeManager.currentMode == .full
+                ) {
+                    handleModeSelection(.full)
                 }
-            )) {
-                ForEach(AppMode.allCases) { mode in
-                    HStack {
-                        Image(systemName: mode.icon)
-                        Text(mode.displayName)
-                    }
-                    .tag(mode)
+                
+                AppModeCard(
+                    mode: .quotaOnly,
+                    isSelected: modeManager.currentMode == .quotaOnly
+                ) {
+                    handleModeSelection(.quotaOnly)
                 }
             }
-            
-            // Description of current mode
-            Text(modeManager.currentMode.description)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                
+            .padding(.vertical, 4)
         } header: {
             Label("settings.appMode".localized(), systemImage: "switch.2")
         } footer: {
@@ -260,6 +250,19 @@ struct AppModeSection: View {
         }
     }
     
+    private func handleModeSelection(_ mode: AppMode) {
+        guard mode != modeManager.currentMode else { return }
+        
+        if modeManager.isFullMode && mode == .quotaOnly {
+            // Confirm before switching from full to quota-only
+            pendingMode = mode
+            showModeChangeConfirmation = true
+        } else {
+            // Switch immediately for other transitions
+            switchToMode(mode)
+        }
+    }
+    
     private func switchToMode(_ mode: AppMode) {
         modeManager.switchMode(to: mode) {
             viewModel.stopProxy()
@@ -268,6 +271,95 @@ struct AppModeSection: View {
         // Re-initialize based on new mode
         Task {
             await viewModel.initialize()
+        }
+    }
+}
+
+// MARK: - App Mode Card
+
+private struct AppModeCard: View {
+    let mode: AppMode
+    let isSelected: Bool
+    let onSelect: () -> Void
+    
+    @State private var isHovered = false
+    
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 12) {
+                // Icon
+                Image(systemName: mode.icon)
+                    .font(.title3)
+                    .foregroundStyle(isSelected ? .white : modeColor)
+                    .frame(width: 36, height: 36)
+                    .background(isSelected ? modeColor : Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(modeColor, lineWidth: isSelected ? 0 : 1.5)
+                    )
+                
+                // Content
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(mode.displayName)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.primary)
+                    
+                    Text(mode.description)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                // Selection indicator
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(isSelected ? modeColor : .secondary.opacity(0.4))
+            }
+            .padding(10)
+            .background(backgroundView)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(borderColor, lineWidth: isSelected ? 2 : 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .animation(.easeInOut(duration: 0.15), value: isSelected)
+    }
+    
+    private var modeColor: Color {
+        switch mode {
+        case .full: return .blue
+        case .quotaOnly: return .green
+        }
+    }
+    
+    private var borderColor: Color {
+        if isSelected {
+            return modeColor
+        } else if isHovered {
+            return Color.secondary.opacity(0.5)
+        } else {
+            return Color.secondary.opacity(0.2)
+        }
+    }
+    
+    @ViewBuilder
+    private var backgroundView: some View {
+        if isSelected {
+            modeColor.opacity(0.08)
+        } else if isHovered {
+            Color.secondary.opacity(0.05)
+        } else {
+            Color.clear
         }
     }
 }

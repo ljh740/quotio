@@ -87,25 +87,11 @@ enum AppMode: String, Codable, CaseIterable, Identifiable {
 final class AppModeManager {
     static let shared = AppModeManager()
     
-    /// Current app mode - persisted to UserDefaults
-    var currentMode: AppMode {
-        get {
-            if let stored = UserDefaults.standard.string(forKey: "appMode"),
-               let mode = AppMode(rawValue: stored) {
-                return mode
-            }
-            return .full
-        }
-        set {
-            UserDefaults.standard.set(newValue.rawValue, forKey: "appMode")
-        }
-    }
+    /// Current app mode - tracked for SwiftUI reactivity
+    private(set) var currentMode: AppMode
     
     /// Whether onboarding has been completed
-    var hasCompletedOnboarding: Bool {
-        get { UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") }
-        set { UserDefaults.standard.set(newValue, forKey: "hasCompletedOnboarding") }
-    }
+    private(set) var hasCompletedOnboarding: Bool
     
     /// Convenience check for quota-only mode
     var isQuotaOnlyMode: Bool { currentMode == .quotaOnly }
@@ -125,14 +111,35 @@ final class AppModeManager {
         return visiblePages.contains(page)
     }
     
+    /// Set current mode and persist to UserDefaults
+    func setMode(_ newMode: AppMode) {
+        currentMode = newMode
+        UserDefaults.standard.set(newMode.rawValue, forKey: "appMode")
+    }
+    
+    /// Set onboarding completed status
+    func setOnboardingCompleted(_ completed: Bool) {
+        hasCompletedOnboarding = completed
+        UserDefaults.standard.set(completed, forKey: "hasCompletedOnboarding")
+    }
+    
     /// Switch mode with validation
     func switchMode(to newMode: AppMode, stopProxyIfNeeded: @escaping () -> Void) {
         if currentMode == .full && newMode == .quotaOnly {
             // Stop proxy when switching to quota-only mode
             stopProxyIfNeeded()
         }
-        currentMode = newMode
+        setMode(newMode)
     }
     
-    private init() {}
+    private init() {
+        // Load from UserDefaults on init
+        if let stored = UserDefaults.standard.string(forKey: "appMode"),
+           let mode = AppMode(rawValue: stored) {
+            self.currentMode = mode
+        } else {
+            self.currentMode = .full
+        }
+        self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+    }
 }

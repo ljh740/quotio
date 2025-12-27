@@ -38,8 +38,8 @@ struct ModePickerView: View {
             // Continue Button
             VStack(spacing: 12) {
                 Button {
-                    modeManager.currentMode = selectedMode
-                    modeManager.hasCompletedOnboarding = true
+                    modeManager.setMode(selectedMode)
+                    modeManager.setOnboardingCompleted(true)
                     onComplete?()
                     dismiss()
                 } label: {
